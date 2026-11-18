@@ -1,0 +1,17 @@
+{
+  "name": "quest-board",
+  "version": "0.1.0",
+  "description": "A local board, dependency map, and inbox for Quest logs (moq-dev/quest) across your repositories",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "bin": { "quest-board": "server.mjs" },
+  "main": "server.mjs",
+  "files": ["server.mjs", "index.html", "lib/"],
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test",
+    "check": "node --check server.mjs && node --check lib/parse.mjs && node --check lib/config.mjs"
+  },
+  "engines": { "node": ">=20" },
+  "keywords": ["quest", "kanban", "roadmap", "markdown", "agents", "claude-code", "codex"]
+}

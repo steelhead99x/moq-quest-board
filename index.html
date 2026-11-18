@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quest Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<style>
+/* 8-bit theme. Night (default) is an NES-style palette; Day is a Game Boy-style one. */
+:root{
+  --px:'Press Start 2P',ui-monospace,monospace;
+  --body:'VT323',ui-monospace,monospace;
+  --bg:#0d0b1e; --bg2:#17142e; --panel:#1f1b3d; --ink:#f8f8f8; --muted:#9a96c4; --line:#4b4580; --shadow:#000;
+  --accent:#fcd820; --accent-ink:#0d0b1e; --link:#6cc8ff;
+  --ready:#fcd820; --needs:#ff7a3d; --claimed:#d38cff; --blocked:#7c7aa0; --epic:#3ce0c8; --danger:#ff4f5e;
+  --xs:#a8a8a8; --s:#5ad85a; --m:#4c9cff; --l:#b469ff; --xl:#ff9c1c;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme=night]){
+  --bg:#c4cfa1; --bg2:#b3c08a; --panel:#d7e0b5; --ink:#1f2d16; --muted:#4d6131; --line:#4d6131; --shadow:#1f2d16;
+  --accent:#1f2d16; --accent-ink:#d7e0b5; --link:#1f4f8f;
+  --ready:#3f6b00; --needs:#a14a00; --claimed:#6a2ca0; --blocked:#6b7a52; --epic:#00665a; --danger:#a1001a;
+  --xs:#6b7a52; --s:#2f7a00; --m:#1f4f8f; --l:#6a2ca0; --xl:#a14a00;
+}}
+:root[data-theme=day]{
+  --bg:#c4cfa1; --bg2:#b3c08a; --panel:#d7e0b5; --ink:#1f2d16; --muted:#4d6131; --line:#4d6131; --shadow:#1f2d16;
+  --accent:#1f2d16; --accent-ink:#d7e0b5; --link:#1f4f8f;
+  --ready:#3f6b00; --needs:#a14a00; --claimed:#6a2ca0; --blocked:#6b7a52; --epic:#00665a; --danger:#a1001a;
+  --xs:#6b7a52; --s:#2f7a00; --m:#1f4f8f; --l:#6a2ca0; --xl:#a14a00;
+}
+*{box-sizing:border-box;border-radius:0!important}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:20px/1.15 var(--body);-webkit-font-smoothing:none;image-rendering:pixelated}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(to bottom,transparent 0 2px,rgba(0,0,0,.08) 2px 3px)}
+/* Chunky pixel frame: a 2px border plus a hard offset shadow. */
+.px{border:2px solid var(--line);box-shadow:4px 4px 0 var(--shadow)}
+header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 16px;background:var(--bg2);border-bottom:4px solid var(--line);position:sticky;top:0;z-index:5}
+h1{font:14px var(--px);margin:0 10px 0 0;color:var(--accent);text-shadow:3px 3px 0 var(--shadow);letter-spacing:1px;white-space:nowrap}
+h1 .gem{display:inline-block;width:12px;height:12px;background:var(--accent);margin-right:8px;box-shadow:3px 3px 0 var(--shadow);vertical-align:-1px}
+input,select,button{font:18px var(--body);color:var(--ink);background:var(--panel);border:2px solid var(--line);padding:3px 8px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button{cursor:pointer;box-shadow:3px 3px 0 var(--shadow);position:relative}
+button:hover{border-color:var(--accent)}
+button:active{box-shadow:none;transform:translate(3px,3px)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font:10px var(--px);padding:8px 10px}
+button.danger{color:var(--danger);border-color:var(--danger)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:9px var(--px);padding:6px 8px}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.spacer{flex:1}
+.hud{padding:10px 16px;display:flex;gap:18px;flex-wrap:wrap;font:10px var(--px);color:var(--muted);align-items:center}
+.hud b{color:var(--ink);font-weight:400}
+.hud .ready b{color:var(--ready)}.hud .needs b{color:var(--needs)}.hud .claimed b{color:var(--claimed)}.hud .blocked b{color:var(--blocked)}
+.banner{margin:0 16px 10px;padding:8px 12px;background:var(--panel);border:2px solid var(--danger);color:var(--ink)}
+.banner code{color:var(--accent)}
+main{display:flex;gap:14px;padding:4px 16px 24px;overflow-x:auto;align-items:flex-start}
+.col{flex:0 0 290px;background:var(--bg2);padding:8px}
+.col h2{font:10px var(--px);margin:4px 4px 12px;display:flex;justify-content:space-between;color:var(--accent)}
+.col h2 span{color:var(--muted)}
+.card{background:var(--panel);border:2px solid var(--line);border-left:8px solid var(--blocked);padding:7px 9px;margin-bottom:10px;cursor:pointer;box-shadow:3px 3px 0 var(--shadow)}
+.card:hover{border-color:var(--accent);transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--shadow)}
+.card.ready{border-left-color:var(--ready)}.card.needs-you{border-left-color:var(--needs)}
+.card.claimed{border-left-color:var(--claimed)}.card.epic{border-left-color:var(--epic)}
+.card.sel,.row.sel{border-color:var(--accent);outline:2px solid var(--accent)}
+.card .t{margin-bottom:5px}
+.card.sel .t::before,.row.sel .t::before{content:"▶ ";color:var(--accent);animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:17px;color:var(--muted)}
+.tag{border:2px solid var(--line);padding:0 4px;font-size:16px}
+.sz{font:8px var(--px);padding:3px 4px;color:#000;background:var(--xs)}
+.sz.S{background:var(--s)}.sz.M{background:var(--m);color:#fff}.sz.L{background:var(--l);color:#fff}.sz.XL{background:var(--xl)}
+.st{font:8px var(--px);text-transform:uppercase}
+.st.ready{color:var(--ready)}.st.needs-you{color:var(--needs)}.st.claimed{color:var(--claimed)}.st.blocked{color:var(--blocked)}.st.epic{color:var(--epic)}
+.st.ready::before{content:"! "}.st.needs-you::before{content:"? "}.st.blocked::before{content:"# "}.st.claimed::before{content:"» "}.st.epic::before{content:"◆ "}
+aside{position:fixed;top:0;right:0;bottom:0;width:min(500px,100vw);background:var(--panel);border-left:4px solid var(--line);padding:16px;overflow:auto;transform:translateX(105%);transition:transform .12s steps(4);z-index:10}
+aside.open{transform:none;box-shadow:-6px 0 0 var(--shadow)}
+aside h3{margin:10px 0 8px;font:12px/1.6 var(--px);color:var(--ink)}
+aside h4{margin:18px 0 6px;font:9px var(--px);color:var(--accent)}
+aside p,aside pre{white-space:pre-wrap;margin:4px 0}
+aside pre{background:var(--bg);border:2px solid var(--line);padding:8px;font:17px/1.15 var(--body);overflow:auto}
+.link{color:var(--link);cursor:pointer;display:block;padding:2px 0;text-decoration:none}
+.link:hover{text-decoration:underline}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.empty{color:var(--muted);padding:30px;text-align:center;flex:1}
+.start{flex:1;text-align:center;padding:60px 16px}
+.start h2{font:16px/1.8 var(--px);color:var(--accent);text-shadow:3px 3px 0 var(--shadow)}
+.start p{max-width:520px;margin:12px auto}
+.press{font:11px var(--px);color:var(--ink);animation:blink 1.2s steps(1) infinite;margin:28px 0}
+dialog{border:4px solid var(--ink);background:var(--panel);color:var(--ink);max-width:min(480px,92vw);padding:18px;box-shadow:6px 6px 0 var(--shadow)}
+dialog h3{font:11px/1.6 var(--px);margin:0 0 10px;color:var(--accent)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog input{width:100%;margin:4px 0}
+.err{color:var(--danger)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--accent-ink);padding:10px 14px;z-index:30;max-width:90vw;font:10px/1.6 var(--px);box-shadow:4px 4px 0 var(--shadow)}
+.graphwrap{flex:1;min-width:0;height:calc(100vh - 150px);overflow:auto;background:var(--bg2);border:2px solid var(--line);position:relative}
+.glegend{position:sticky;top:0;left:0;padding:8px 12px;font-size:17px;color:var(--muted);background:var(--bg2);display:flex;gap:14px;align-items:center;flex-wrap:wrap;z-index:1;border-bottom:2px solid var(--line)}
+.gn{cursor:pointer}.gn rect.box{fill:var(--panel);stroke:var(--line);stroke-width:2}.gn:hover rect.box{stroke:var(--accent)}
+.gn text{fill:var(--ink);font:17px var(--body)}.gn text.sub{fill:var(--muted);font:8px var(--px)}
+.gn rect.sh{fill:var(--shadow)}
+.gn .bar{fill:var(--blocked)}.gn.ready .bar{fill:var(--ready)}.gn.needs-you .bar{fill:var(--needs)}.gn.claimed .bar{fill:var(--claimed)}.gn.epic .bar{fill:var(--epic)}
+.gn.sel rect.box{stroke:var(--accent);stroke-width:4}
+.ge{fill:none;stroke:var(--line);stroke-width:2}
+.ge.hi{stroke:var(--accent);stroke-width:3}
+.dim{opacity:.15}
+.inbox{flex:1;max-width:900px}
+.inbox h2{font:10px var(--px);margin:16px 2px 10px;color:var(--accent)}
+.row{background:var(--panel);border:2px solid var(--line);border-left:8px solid var(--needs);padding:9px 12px;margin-bottom:10px;cursor:pointer;box-shadow:3px 3px 0 var(--shadow)}
+.row.other{border-left-color:var(--blocked)}.row:hover{border-color:var(--accent)}
+.row .w{margin:4px 0}
+.plist{list-style:none;padding:0;margin:8px 0}
+.plist li{display:flex;gap:8px;align-items:center;justify-content:space-between;border-bottom:2px dashed var(--line);padding:6px 0}
+.plist small{color:var(--muted);display:block}
+@media(max-width:700px){.col{flex-basis:85vw}h1{font-size:11px}}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="gem"></span>QUEST BOARD</h1>
+  <div class="chips" id="viewChips" role="tablist" aria-label="View"></div>
+  <select id="project" aria-label="Project"></select>
+  <input id="q" type="search" placeholder="Search… ( / )" size="18" aria-label="Search quests">
+  <div class="chips" id="statusChips" aria-label="Status filter"></div>
+  <span class="spacer"></span>
+  <button id="projects" title="Manage projects">Projects</button>
+  <button id="theme" title="Switch day/night palette">☼</button>
+  <button id="refresh" title="Reload every tree">Refresh</button>
+</header>
+<div class="hud" id="stats" aria-live="polite"></div>
+<div id="banners"></div>
+<main id="board"></main>
+<aside id="panel" aria-label="Quest details"></aside>
+<dialog id="dlg"></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const STATUSES = [['all', 'All'], ['ready', 'Ready'], ['needs-you', 'Needs you'], ['claimed', 'Claimed'], ['blocked', 'Blocked'], ['epic', 'Epics']];
+const VIEWS = [['board', 'Board'], ['graph', 'Map'], ['inbox', 'Inbox']];
+const LABEL = { ready: 'Ready', 'needs-you': 'Needs you', claimed: 'Claimed', blocked: 'Blocked', epic: 'Epic' };
+const claimBranch = (id) => id.replace(/\.md$/, '');
+let data = null, health = null, claims = {};
+const state = { project: 'all', status: 'all', q: '', sel: null, view: 'board', iso: false, theme: null };
+try { Object.assign(state, JSON.parse(localStorage.getItem('quest-board') || '{}'), { sel: null }); } catch {}
+if (state.theme) document.documentElement.dataset.theme = state.theme;
+
+async function api(url, body) {
+  const r = await fetch(url, body ? { method: 'POST', headers: { 'content-type': 'application/json', 'x-quest-board': '1' }, body: JSON.stringify(body) } : {});
+  const j = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+  if (!r.ok && !j.error) j.error = `HTTP ${r.status}`;
+  return j;
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 3500); }
+
+let loadedAt = 0, loading = false;
+async function load(quiet) {
+  if (loading) return;
+  loading = true;
+  try {
+    if (!quiet) $('#stats').textContent = 'LOADING…';
+    [data, health] = await Promise.all([api('/api/board'), health || api('/api/health')]);
+    if (data.error) throw new Error(data.error);
+    claims = {};
+    render();
+    await Promise.all(data.projects.filter(p => !p.error).map(async (p) => {
+      claims[p.name] = await api('/api/claims?project=' + encodeURIComponent(p.name));
+      render();
+    }));
+  } catch (e) {
+    toast('Could not reach the server: ' + e.message);
+  } finally { loading = false; loadedAt = Date.now(); }
+}
+
+let cache = null;
+function all() {
+  if (cache) return cache;
+  const out = [];
+  for (const p of data.projects) {
+    const byBranch = new Map((claims[p.name]?.prs || []).map(x => [x.headRefName, x]));
+    for (const q of p.quests) {
+      const pr = byBranch.get(claimBranch(q.id));
+      out.push({ ...q, project: p.name, pr, display: pr && q.status !== 'epic' ? 'claimed' : q.status });
+    }
+  }
+  return (cache = out);
+}
+const key = (q) => q.project + '::' + q.id;
+const inProject = (q) => state.project === 'all' || q.project === state.project;
+
+function visible() {
+  const s = state.q.toLowerCase();
+  return all().filter(q => q.kind !== 'root' && inProject(q)
+    && (state.status === 'all' || q.display === state.status)
+    && (!s || (q.title + ' ' + q.id + ' ' + q.goal).toLowerCase().includes(s)));
+}
+
+function render() {
+  if (!data) return;
+  cache = null;
+  if (state.project !== 'all' && !data.projects.some(p => p.name === state.project)) state.project = 'all';
+  $('#project').innerHTML = '<option value="all">All projects</option>' + data.projects.map(p => `<option value="${esc(p.name)}" ${p.name === state.project ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+  $('#viewChips').innerHTML = VIEWS.map(([k, l]) => `<button class="chip ${state.view === k ? 'on' : ''}" data-v="${k}" role="tab" aria-selected="${state.view === k}">${l}</button>`).join('');
+  $('#statusChips').innerHTML = STATUSES.map(([k, l]) => `<button class="chip ${state.status === k ? 'on' : ''}" data-s="${k}" aria-pressed="${state.status === k}">${l}</button>`).join('');
+  renderBanners();
+  const every = all().filter(q => q.kind !== 'root' && inProject(q));
+  const n = (st) => every.filter(q => q.display === st).length;
+  $('#stats').innerHTML = data.projects.length
+    ? `<span class="ready">READY <b>${n('ready')}</b></span><span class="needs">NEED YOU <b>${n('needs-you')}</b></span><span class="claimed">CLAIMED <b>${n('claimed')}</b></span><span class="blocked">BLOCKED <b>${n('blocked')}</b></span><span>WORLDS <b>${data.projects.length}</b></span>`
+    : '';
+  if (!data.projects.length) { $('#board').innerHTML = startScreen(); save(); return; }
+  if (state.view === 'inbox') renderInbox();
+  else if (state.view === 'graph') renderGraph(visible());
+  else renderBoard(visible());
+  if (state.sel) openPanel(state.sel, true);
+  save();
+}
+
+function renderBanners() {
+  const b = [];
+  if (health && !health.quest) b.push('The <code>quest</code> command was not found, so nothing can be ranked as ready. Install it from <a class="link" style="display:inline" href="https://github.com/moq-dev/quest" target="_blank" rel="noopener">moq-dev/quest</a> or set <code>QUEST_BIN</code>.');
+  if (health && !health.gh) b.push('The <code>gh</code> command was not found, so claims (open PRs) are not shown.');
+  for (const p of data.projects) {
+    if (p.error) b.push(`<b>${esc(p.name)}</b>: ${esc(p.error)}`);
+    else if (p.readyError) b.push(`<b>${esc(p.name)}</b>: quest unblocked failed: ${esc(p.readyError)}`);
+    else if (p.check && !p.check.ok) b.push(`<b>${esc(p.name)}</b>: quest check failed: ${esc(p.check.message)}`);
+    const c = claims[p.name];
+    if (c?.error && health?.gh) b.push(`<b>${esc(p.name)}</b>: could not list PRs: ${esc(c.error)}`);
+  }
+  $('#banners').innerHTML = b.map(x => `<div class="banner">${x}</div>`).join('');
+}
+
+function startScreen() {
+  return `<div class="start"><h2>QUEST BOARD</h2>
+    <p>Track the quests in every repository that keeps a <code>quest/</code> log, see what is ready, what waits on you, and claim work.</p>
+    <div class="press">PRESS START</div>
+    <button class="primary" id="addProj">+ Add a repository</button>
+    <p style="color:var(--muted)">Or run <code>quest-board ~/path/to/repo</code>. Projects are saved in <code>${esc(health?.config || 'projects.json')}</code>.</p></div>`;
+}
+
+function renderBoard(list) {
+  const cols = {};
+  for (const q of list) (cols[q.milestone || '—'] ||= []).push(q);
+  const names = Object.keys(cols).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  $('#board').innerHTML = names.length ? names.map(m => {
+    const items = cols[m].sort((a, b) => (b.dependents ?? -1) - (a.dependents ?? -1) || a.id.localeCompare(b.id));
+    return `<section class="col px"><h2>STAGE ${esc(m)} <span>${items.length}</span></h2>${items.map(card).join('')}</section>`;
+  }).join('') : '<div class="empty">No quests match.</div>';
+}
+
+function card(q) {
+  const sz = q.size ? `<span class="sz ${q.size}">${q.size}</span>` : '';
+  const proj = data.projects.length > 1 ? `<span class="tag">${esc(q.project)}</span>` : '';
+  const dep = q.dependents ? `<span title="quests this unblocks">+${q.dependents} XP</span>` : '';
+  const pr = q.pr ? `<span>PR #${q.pr.number}${q.pr.isDraft ? ' draft' : ''}</span>` : '';
+  const epic = q.epic ? `<span class="tag">${esc(q.epic.split('/').slice(-2, -1)[0])}</span>` : '';
+  return `<div class="card ${q.display} ${state.sel === key(q) ? 'sel' : ''}" data-k="${esc(key(q))}" tabindex="0">
+    <div class="t">${esc(q.title)}</div>
+    <div class="meta">${sz}<span class="st ${q.display}">${LABEL[q.display] || q.display}</span>${dep}${pr}${proj}${epic}</div></div>`;
+}
+
+function renderInbox() {
+  const s = state.q.toLowerCase();
+  const items = all().filter(q => q.waiting.length && inProject(q)
+    && (!s || (q.title + ' ' + q.id + ' ' + q.waiting.map(w => w.party + ' ' + w.text).join(' ')).toLowerCase().includes(s)));
+  const mine = (q) => q.waiting.some(w => /^maintainer$/i.test(w.party));
+  const rank = (a, b) => (a.milestone || '').localeCompare(b.milestone || '', undefined, { numeric: true }) || ((b.dependents ?? 0) - (a.dependents ?? 0)) || a.id.localeCompare(b.id);
+  const row = (q) => `<div class="row ${mine(q) ? '' : 'other'} ${state.sel === key(q) ? 'sel' : ''}" data-k="${esc(key(q))}" tabindex="0">
+    <div class="t">${esc(q.title)}</div>
+    ${q.waiting.map(w => `<div class="w"><b>${esc(w.party)}:</b> ${esc(w.text)}</div>`).join('')}
+    <div class="meta">${q.size ? `<span class="sz ${q.size}">${q.size}</span>` : ''}<span class="st ${q.display}">${LABEL[q.display] || q.display}</span><span class="tag">${esc(q.project)}</span>${q.milestone ? `<span class="tag">${esc(q.milestone)}</span>` : ''}${q.dependents ? `<span>+${q.dependents} XP</span>` : ''}${q.pr ? `<span>PR #${q.pr.number}</span>` : ''}</div></div>`;
+  const a = items.filter(mine).sort(rank), b = items.filter(q => !mine(q)).sort(rank);
+  $('#board').innerHTML = `<div class="inbox">${a.length ? `<h2>WAITING ON YOU (${a.length})</h2>${a.map(row).join('')}` : ''}${b.length ? `<h2>WAITING ON OTHERS (${b.length})</h2>${b.map(row).join('')}` : ''}${items.length ? '' : '<div class="empty">Nothing is waiting.</div>'}</div>`;
+}
+
+function renderGraph(list) {
+  const board = $('#board'), old = board.querySelector('.graphwrap');
+  const sl = old?.scrollLeft || 0, st = old?.scrollTop || 0;
+  const byId = new Map(list.map(q => [key(q), q]));
+  const edges = [], out = new Map(), inn = new Map();
+  const push = (m, k, v) => (m.get(k) || m.set(k, []).get(k)).push(v);
+  for (const q of list) for (const r of q.required) {
+    const a = q.project + '::' + r.target, b = key(q);
+    if (!byId.has(a)) continue;
+    edges.push([a, b]); push(out, a, b); push(inn, b, a);
+  }
+  const connected = new Set(edges.flat());
+  const nodes = list.filter(q => state.iso || connected.has(key(q)));
+  if (!nodes.length) { board.innerHTML = '<div class="empty">No dependencies among the quests shown. Try clearing the filters.</div>'; return; }
+  // Longest-path layering: a quest sits one column right of its deepest blocker.
+  const layer = new Map(), onStack = new Set();
+  const depth = (k) => {
+    if (layer.has(k)) return layer.get(k);
+    if (onStack.has(k)) return 0; // cycle: quest check reports these
+    onStack.add(k);
+    const l = (inn.get(k) || []).reduce((m, p) => Math.max(m, depth(p) + 1), 0);
+    onStack.delete(k);
+    layer.set(k, l);
+    return l;
+  };
+  nodes.forEach(q => depth(key(q)));
+  const layers = [];
+  nodes.map(key).sort().forEach(k => (layers[layer.get(k)] ||= []).push(k));
+  for (let i = 0; i < layers.length; i++) layers[i] ||= [];
+  // Barycenter sweeps to reduce crossings.
+  const pos = new Map();
+  const index = () => layers.forEach(L => L.forEach((k, i) => pos.set(k, i)));
+  index();
+  const bary = (k, nb) => { const a = (nb.get(k) || []).filter(x => pos.has(x)); return a.length ? a.reduce((s, x) => s + pos.get(x), 0) / a.length : pos.get(k); };
+  for (let it = 0; it < 4; it++) {
+    for (let i = 1; i < layers.length; i++) { const b = new Map(layers[i].map(k => [k, bary(k, inn)])); layers[i].sort((x, y) => b.get(x) - b.get(y)); index(); }
+    for (let i = layers.length - 2; i >= 0; i--) { const b = new Map(layers[i].map(k => [k, bary(k, out)])); layers[i].sort((x, y) => b.get(x) - b.get(y)); index(); }
+  }
+  const W = 240, H = 44, GX = 80, GY = 16, P = 20;
+  const xy = new Map();
+  layers.forEach((L, i) => L.forEach((k, j) => xy.set(k, [P + i * (W + GX), P + j * (H + GY)])));
+  const width = P * 2 + layers.length * (W + GX) - GX + 4, height = P * 2 + Math.max(...layers.map(L => L.length)) * (H + GY);
+  let rel = null;
+  if (state.sel && xy.has(state.sel)) {
+    rel = new Set([state.sel]);
+    for (const m of [out, inn]) { const stack = [state.sel]; while (stack.length) for (const n of m.get(stack.pop()) || []) if (!rel.has(n)) { rel.add(n); stack.push(n); } }
+  }
+  // Orthogonal, pixel-style edges.
+  const path = ([a, b]) => { const [x1, y1] = xy.get(a), [x2, y2] = xy.get(b), mx = Math.round(x2 - GX / 2); return `M${x1 + W},${y1 + H / 2} H${mx} V${y2 + H / 2} H${x2 - 2}`; };
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" role="img" aria-label="Quest dependency map">
+    ${edges.map(e => `<path class="ge ${rel ? (rel.has(e[0]) && rel.has(e[1]) ? 'hi' : 'dim') : ''}" d="${path(e)}"/>`).join('')}
+    ${nodes.map(q => {
+      const k = key(q), [x, y] = xy.get(k), t = q.title.length > 30 ? q.title.slice(0, 29) + '…' : q.title;
+      return `<g class="gn ${q.display} ${state.sel === k ? 'sel' : ''} ${rel && !rel.has(k) ? 'dim' : ''}" data-k="${esc(k)}" transform="translate(${x},${y})"><title>${esc(q.title)}</title>
+        <rect class="sh" x="4" y="4" width="${W}" height="${H}"/><rect class="box" width="${W}" height="${H}"/><rect class="bar" width="8" height="${H}"/>
+        <text x="16" y="19">${esc(t)}</text><text class="sub" x="16" y="35">${q.size ? q.size + ' ' : ''}${(LABEL[q.display] || q.display).toUpperCase()}${data.projects.length > 1 ? ' ' + esc(q.project) : ''}</text></g>`;
+    }).join('')}
+  </svg>`;
+  board.innerHTML = `<div class="graphwrap"><div class="glegend"><span>${nodes.length} quests · ${edges.length} links · blockers left, dependents right · click a quest to trace its path</span><label><input type="checkbox" id="iso" ${state.iso ? 'checked' : ''}> show lone quests</label></div>${svg}</div>`;
+  const w = board.querySelector('.graphwrap'); w.scrollLeft = sl; w.scrollTop = st;
+}
+
+function find(k) { return all().find(q => key(q) === k); }
+
+function openPanel(k, keep) {
+  const q = find(k);
+  if (!q) { closePanel(); return; }
+  state.sel = k;
+  const lookup = (t) => all().find(x => x.project === q.project && x.id === t);
+  const linkList = (arr, field) => arr.length ? arr.map(r => {
+    const id = field ? r[field] : r, tq = lookup(id);
+    return `<a class="link" data-k="${esc(q.project + '::' + id)}" tabindex="0">${esc(tq?.title || r.label || id)} ${tq ? `<span class="st ${tq.display}">${LABEL[tq.display] || ''}</span>` : '<span class="err">(missing)</span>'}${r.why ? `<span style="color:var(--muted)"> — ${esc(r.why)}</span>` : ''}</a>`;
+  }).join('') : '<p style="color:var(--muted)">None</p>';
+  const canClaim = (q.status === 'ready' || q.status === 'needs-you') && !q.pr;
+  $('#panel').innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:8px"><span class="tag">${esc(q.project)} · ${esc(q.id)}</span><button id="close" aria-label="Close">✕</button></div>
+    <h3>${q.size ? `<span class="sz ${q.size}">${q.size}</span> ` : ''}${esc(q.title)}</h3>
+    <div class="meta"><span class="st ${q.display}">${LABEL[q.display] || q.display}</span>${q.dependents ? `<span>unblocks ${q.dependents}</span>` : ''}${q.scheduled ? `<span>scheduled ${esc(q.scheduled.split('\n')[0].replace(/^[-*]\s*/, ''))}</span>` : ''}${q.pr ? `<a class="link" style="display:inline" target="_blank" rel="noopener" href="${esc(q.pr.url)}">PR #${q.pr.number}${q.pr.isDraft ? ' (draft)' : ''}</a>` : ''}</div>
+    <div class="actions">
+      ${canClaim ? '<button class="primary" data-a="claim">CLAIM QUEST</button>' : ''}
+      ${q.pr && q.pr.isDraft ? '<button class="danger" data-a="release">Release claim</button>' : ''}
+      ${q.status === 'blocked' ? '<button data-a="blockers">Why blocked?</button>' : ''}
+      <button data-a="open-file">Open file</button>
+      <button data-copy="${esc(q.id)}">Copy path</button>
+    </div>
+    <div id="out"></div>
+    ${q.waiting.length ? `<h4>WAITING ON</h4>${q.waiting.map(w => `<p><b>${esc(w.party)}:</b> ${esc(w.text)}</p>`).join('')}` : ''}
+    <h4>GOAL</h4><p>${esc(q.goal) || '—'}</p>
+    <h4>REQUIRED (${q.required.length})</h4>${linkList(q.required, 'target')}
+    <h4>UNBLOCKS (${q.requiredBy.length})</h4>${linkList(q.requiredBy)}
+    ${q.related.length ? `<h4>RELATED</h4>${linkList(q.related, 'target')}` : ''}
+    ${q.plan ? `<h4>PLAN</h4><pre>${esc(q.plan)}</pre>` : ''}
+    ${q.hosts ? `<h4>HOSTS</h4><pre>${esc(q.hosts)}</pre>` : ''}`;
+  $('#panel').classList.add('open');
+  if (!keep) render();
+}
+function closePanel() { state.sel = null; $('#panel').classList.remove('open'); }
+
+async function act(a) {
+  const q = find(state.sel); if (!q) return;
+  if (a === 'claim' || a === 'release') {
+    const msg = a === 'claim'
+      ? `Claim "${q.title}"?\n\nThis pushes an empty claim commit to the branch ${claimBranch(q.id)} and opens a draft PR on GitHub. It also switches the ${q.project} checkout to that branch.`
+      : `Release the claim on "${q.title}"?\n\nThis deletes the claim branch and closes its draft PR, but only while the branch holds nothing but the empty claim commit.`;
+    if (!(await confirmDialog(a === 'claim' ? 'ACCEPT QUEST?' : 'ABANDON QUEST?', msg, a === 'claim' ? 'Claim' : 'Release'))) return;
+  }
+  const out = $('#out');
+  out.innerHTML = '<pre>Running…</pre>';
+  const r = await api('/api/action', { project: q.project, quest: q.id, action: a });
+  // The panel may have moved on to another quest while this ran.
+  if (state.sel !== key(q)) return;
+  $('#out').innerHTML = `<pre class="${r.ok === false || r.error ? 'err' : ''}">${esc(r.output || r.error || 'Done.')}</pre>`;
+  if (a === 'claim' || a === 'release') {
+    toast(r.ok ? (a === 'claim' ? 'QUEST ACCEPTED!' : 'QUEST RELEASED') : 'FAILED');
+    claims[q.project] = await api('/api/claims?project=' + encodeURIComponent(q.project));
+    render();
+  }
+}
+
+function confirmDialog(title, msg, label) {
+  return new Promise((res) => {
+    const d = $('#dlg');
+    d.innerHTML = `<h3>${esc(title)}</h3><p style="white-space:pre-wrap">${esc(msg)}</p><div class="actions" style="justify-content:flex-end"><button data-r="0">Cancel</button><button data-r="1" class="primary">${esc(label)}</button></div>`;
+    d.onclose = () => res(d.returnValue === '1');
+    d.returnValue = '';
+    d.querySelectorAll('[data-r]').forEach(b => b.onclick = () => d.close(b.dataset.r));
+    d.showModal();
+  });
+}
+
+function projectsDialog() {
+  const d = $('#dlg');
+  const list = data?.projects || [];
+  d.innerHTML = `<h3>PROJECTS</h3>
+    <ul class="plist">${list.map(p => `<li><span>${esc(p.name)}<small>${esc(p.path)}</small></span><button class="danger" data-rm="${esc(p.name)}">Remove</button></li>`).join('') || '<li style="color:var(--muted)">None yet.</li>'}</ul>
+    <form method="dialog" id="addForm">
+      <p style="color:var(--muted)">Add a local checkout with a <code>quest/</code> directory.</p>
+      <input id="pp" placeholder="~/path/to/repo" required autocomplete="off">
+      <input id="pn" placeholder="Name (optional)" autocomplete="off">
+      <p id="pe" class="err" role="alert"></p>
+      <div class="actions" style="justify-content:flex-end"><button type="button" data-close>Close</button><button class="primary" type="submit">Add</button></div>
+    </form>`;
+  d.onclose = null;
+  d.querySelector('[data-close]').onclick = () => d.close();
+  d.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
+    const r = await api('/api/projects/remove', { name: b.dataset.rm });
+    if (r.error) return toast(r.error);
+    await load(true); projectsDialog();
+  });
+  d.querySelector('#addForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const r = await api('/api/projects', { path: d.querySelector('#pp').value.trim(), name: d.querySelector('#pn').value.trim() });
+    if (r.error) { d.querySelector('#pe').textContent = r.error; return; }
+    d.close(); toast('PROJECT ADDED'); load();
+  };
+  if (!d.open) d.showModal();
+  d.querySelector('#pp').focus();
+}
+
+function save() {
+  try { localStorage.setItem('quest-board', JSON.stringify({ project: state.project, status: state.status, q: state.q, view: state.view, iso: state.iso, theme: state.theme })); } catch {}
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-k],[data-v],[data-s],[data-a],[data-copy],#close,#refresh,#addProj,#projects,#theme');
+  if (!t || t.closest('dialog')) return;
+  if (t.dataset.v) { state.view = t.dataset.v; render(); }
+  else if (t.dataset.s) { state.status = t.dataset.s; render(); }
+  else if (t.dataset.a) act(t.dataset.a);
+  else if (t.dataset.copy) navigator.clipboard.writeText(t.dataset.copy).then(() => toast('COPIED'), () => toast('Copy failed'));
+  else if (t.dataset.k) openPanel(t.dataset.k);
+  else if (t.id === 'close') { closePanel(); render(); }
+  else if (t.id === 'refresh') load();
+  else if (t.id === 'addProj' || t.id === 'projects') projectsDialog();
+  else if (t.id === 'theme') {
+    const dark = state.theme ? state.theme === 'night' : !matchMedia('(prefers-color-scheme: light)').matches;
+    state.theme = dark ? 'day' : 'night';
+    document.documentElement.dataset.theme = state.theme;
+    save();
+  }
+});
+document.addEventListener('change', (e) => { if (e.target.id === 'iso') { state.iso = e.target.checked; render(); } });
+$('#project').onchange = (e) => { state.project = e.target.value; render(); };
+$('#q').value = state.q;
+$('#q').oninput = (e) => { state.q = e.target.value; render(); };
+window.addEventListener('focus', () => { if (Date.now() - loadedAt > 60000) load(true); });
+document.addEventListener('keydown', (e) => {
+  const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '');
+  if (e.key === '/' && !typing) { e.preventDefault(); $('#q').focus(); return; }
+  if (e.key === 'Enter' && !typing && document.activeElement?.dataset.k) { openPanel(document.activeElement.dataset.k); return; }
+  if (e.key === 'Escape' && state.sel && !$('#dlg').open) { closePanel(); render(); }
+});
+load();
+</script>
+</body>
+</html>
