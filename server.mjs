@@ -5,13 +5,14 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { scanTree } from './lib/parse.mjs';
+import { deriveStatus, readyIndex, waitsOnMaintainer } from './lib/status.mjs';
 import { configPath, loadProjects, saveProjects, addProject, expand } from './lib/config.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = (process.env.HOST || '127.0.0.1').replace(/^\[|\]$/g, '');
 const QUEST = process.env.QUEST_BIN || 'quest';
 const GH = process.env.GH_BIN || 'gh';
 
@@ -62,20 +63,15 @@ async function projectView(proj) {
     run(QUEST, ['unblocked', '--json'], root),
     run(QUEST, ['check'], root),
   ]);
-  const readyMap = new Map();
+  let readyMap = new Map();
   let readyError = null;
   if (ready.ok) {
-    try { for (const r of JSON.parse(ready.stdout)) readyMap.set(r.path, r); } catch { readyError = 'quest unblocked printed invalid JSON'; }
+    try { readyMap = readyIndex(JSON.parse(ready.stdout)); } catch { readyError = 'quest unblocked printed invalid JSON'; }
   } else readyError = tail(ready.stderr || ready.stdout, 3);
   const out = [];
   for (const q of quests.values()) {
-    const r = readyMap.get(q.id);
-    let status;
-    if (q.kind === 'root') status = 'root';
-    else if (q.kind === 'milestone' || q.kind === 'epic') status = 'epic';
-    else if (r) status = q.waiting.length ? 'needs-you' : 'ready';
-    else status = 'blocked';
-    out.push({ ...q, status, dependents: r?.dependents ?? null });
+    const status = deriveStatus(q, readyMap);
+    out.push({ ...q, status, waitsOnYou: waitsOnMaintainer(q.waiting), dependents: readyMap.get(q.id)?.dependents ?? null });
   }
   return {
     name: proj.name,
@@ -88,49 +84,89 @@ async function projectView(proj) {
 
 async function claims(proj) {
   const root = path.resolve(expand(proj.path));
-  const r = await run(GH, ['pr', 'list', '--state', 'open', '--limit', '200',
+  const r = await run(GH, ['pr', 'list', '--state', 'open', '--limit', '500',
     '--json', 'number,headRefName,url,isDraft,title,updatedAt'], root, 30000);
   if (!r.ok) return { error: r.missing ? 'gh is not installed' : tail(r.stderr, 2), prs: [] };
   try { return { prs: JSON.parse(r.stdout) }; } catch { return { error: 'gh printed invalid JSON', prs: [] }; }
 }
 
+/** Open a file with the desktop's default app. Resolves once the opener has started (not exited). */
 function openFile(file) {
-  if (process.platform === 'darwin') return run('open', [file], undefined, 10000);
-  if (process.platform === 'win32') return run('explorer.exe', [file], undefined, 10000);
-  return run('xdg-open', [file], undefined, 10000);
+  let cmd, args, opts = { detached: true, stdio: 'ignore' };
+  if (process.platform === 'darwin') { cmd = 'open'; args = [file]; }
+  else if (process.platform === 'win32') {
+    // `start` is a cmd builtin; quote the path ourselves and pass it verbatim.
+    if (/["%]/.test(file)) return Promise.resolve({ ok: false, stdout: '', stderr: 'cannot open a path containing " or %' });
+    cmd = 'cmd.exe'; args = ['/d', '/s', '/c', `"start "" "${file}""`];
+    opts = { ...opts, windowsVerbatimArguments: true, windowsHide: true };
+  } else { cmd = 'xdg-open'; args = [file]; }
+  return new Promise((resolve) => {
+    let child;
+    try { child = spawn(cmd, args, opts); } catch (e) { return resolve({ ok: false, stdout: '', stderr: e.message }); }
+    child.once('error', (e) => resolve({ ok: false, stdout: '', stderr: e.code === 'ENOENT' ? `${cmd} is not installed` : e.message }));
+    child.once('spawn', () => { child.unref(); resolve({ ok: true, stdout: '', stderr: '' }); });
+  });
 }
 
+class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
+
 const json = (res, code, body) => {
-  res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+  res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
   res.end(JSON.stringify(body));
 };
+/** Read a JSON object body; anything else is a 400. */
 const readBody = (req) => new Promise((resolve, reject) => {
   let b = '';
   req.setEncoding('utf8');
-  req.on('data', (c) => { b += c; if (b.length > 1e5) { reject(new Error('request too large')); req.destroy(); } });
-  req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { reject(new Error('invalid JSON body')); } });
+  req.on('data', (c) => { b += c; if (b.length > 1e5) { reject(new HttpError(413, 'request too large')); req.destroy(); } });
+  req.on('end', () => {
+    let v;
+    try { v = b ? JSON.parse(b) : {}; } catch { return reject(new HttpError(400, 'invalid JSON body')); }
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return reject(new HttpError(400, 'body must be a JSON object'));
+    resolve(v);
+  });
   req.on('error', reject);
 });
 
-export function createServer({ config = configPath(), port = 4577 } = {}) {
-  const allowed = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`, `http://${HOST}:${port}`]);
+const STATIC = {
+  '/': ['index.html', 'text/html; charset=utf-8'],
+  '/index.html': ['index.html', 'text/html; charset=utf-8'],
+  '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
+  '/style.css': ['style.css', 'text/css; charset=utf-8'],
+};
+const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+
+const bracket = (h) => (h.includes(':') && !h.startsWith('[') ? `[${h}]` : h);
+
+/** Host header values this server answers to when bound on `port`: loopback names and the configured host. */
+export function allowedHosts(host, port) {
+  const names = ['127.0.0.1', 'localhost', '[::1]', bracket(host)].map((h) => h.toLowerCase());
+  const set = new Set(names.map((h) => `${h}:${port}`));
+  if (port === 80) for (const h of names) set.add(h); // browsers omit the default port
+  return set;
+}
+
+export function createServer({ config = configPath(), host = HOST } = {}) {
   const projects = () => loadProjects(config);
   const findProject = (name) => projects().find((p) => p.name === name);
 
   return http.createServer(async (req, res) => {
     try {
+      // Refuse any Host that is not this server's own: a DNS-rebinding page reaches us under its own name.
+      const hostHeader = String(req.headers.host || '').toLowerCase();
+      if (!allowedHosts(host, req.socket.localPort).has(hostHeader)) return json(res, 403, { error: 'forbidden host' });
       const url = new URL(req.url, 'http://localhost');
-      if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        res.writeHead(200, {
-          'content-type': 'text/html; charset=utf-8',
-          'content-security-policy': "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:",
-        });
-        return res.end(fs.readFileSync(path.join(HERE, 'index.html')));
+      const file = req.method === 'GET' && Object.hasOwn(STATIC, url.pathname) ? STATIC[url.pathname] : null;
+      if (file) {
+        const headers = { 'content-type': file[1], 'x-content-type-options': 'nosniff' };
+        if (file[0] === 'index.html') headers['content-security-policy'] = CSP;
+        res.writeHead(200, headers);
+        return res.end(fs.readFileSync(path.join(HERE, file[0])));
       }
       if (req.method === 'POST') {
-        // Local-only server: reject requests from other sites.
+        // Local-only server: reject requests from other sites. Same-origin means Origin names our validated Host.
         const origin = req.headers.origin;
-        if (req.headers['x-quest-board'] !== '1' || (origin && !allowed.has(origin)))
+        if (req.headers['x-quest-board'] !== '1' || (origin && origin.toLowerCase() !== `http://${hostHeader}`))
           return json(res, 403, { error: 'forbidden' });
       }
 
@@ -189,7 +225,7 @@ export function createServer({ config = configPath(), port = 4577 } = {}) {
       }
       json(res, 404, { error: 'not found' });
     } catch (e) {
-      json(res, 500, { error: String(e.message || e) });
+      json(res, e instanceof HttpError ? e.status : 500, { error: String(e.message || e) });
     }
   });
 }
@@ -207,10 +243,15 @@ if (isMain) {
     }
     saveProjects(config, list);
   }
-  const server = createServer({ config, port: opts.port });
+  const server = createServer({ config, host: HOST });
+  server.on('error', (e) => {
+    const why = e.code === 'EADDRINUSE' ? `port ${opts.port} is already in use` : e.code === 'EACCES' ? `no permission to listen on port ${opts.port}` : e.message;
+    console.error(`quest-board: ${why}`);
+    process.exit(1);
+  });
   server.listen(opts.port, HOST, () => {
     const { port } = server.address();
-    console.log(`Quest Board: http://${HOST}:${port}`);
+    console.log(`Quest Board: http://${bracket(HOST)}:${port}`);
     console.log(`Projects: ${config}`);
   });
 }
