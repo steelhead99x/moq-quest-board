@@ -1,22 +1,21 @@
 # Quest Board
 
 An 8-bit quest log for your repositories. Quest Board is a local web UI over
-[Quest](https://github.com/moq-dev/quest) trees, the `quest/` folders of
-Markdown plans that you and your agents read, claim, and finish. Point it at
-one repository or many and see every quest in one place.
+[Quest](https://github.com/moq-dev/quest) trees: the `quest/` directories of
+Markdown plans that you and your agents claim and finish. Point it at one
+repository or several.
 
 - **Board:** one column per milestone, with each quest's size, status, how
-  many quests it unblocks, and its claim PR.
-- **Map:** the `## Required` links as a graph, blockers on the left and
-  dependents on the right. Click a quest to trace its whole chain.
-- **Inbox:** every `## Waiting` item, the maintainer's first, then those
-  waiting on outside parties. "You" here means the `Maintainer` party, as in
-  the Quest guide; any other party is "others".
-- **Actions:** claim a ready quest (`quest start`), release a claim
-  (`quest start --release`), see why a quest is blocked, open its file.
+  many quests it unlocks, and its claim PR.
+- **Map:** the `## Required` links as a graph. Click a quest to trace its chain.
+- **Inbox:** every `## Waiting` item, the `Maintainer`'s first.
 
-It has no dependencies and nothing to build. It runs on your machine and
-talks only to the `quest` and `gh` commands you already use.
+From a quest's panel you can claim it (`quest start`), release the claim, see
+its blockers, or open its file.
+
+No dependencies, no build step. It runs on your machine and runs only `quest`
+and `gh`. The theme's two fonts load from Google Fonts, falling back to your
+system monospace font offline.
 
 ## Requirements
 
@@ -47,21 +46,24 @@ and remove projects from the **Projects** button.
 | `QUEST_BOARD_CONFIG` | Project list file (see below)                                           |
 | `QUEST_BIN`, `GH_BIN` | Paths to the `quest` and `gh` commands                                 |
 
-The project list defaults to `$XDG_CONFIG_HOME/quest-board/projects.json` when
-`XDG_CONFIG_HOME` is set, else `%APPDATA%\quest-board\projects.json` on Windows,
-else `~/.config/quest-board/projects.json`. A leading `~/` or `~\` in a path
-means your home folder. Paths you add are stored absolute, or in `~/` form if
-you gave one. The project list is plain JSON:
+The list is stored in `$XDG_CONFIG_HOME/quest-board/projects.json`
+(`%APPDATA%` on Windows, else `~/.config`). Paths are stored absolute, or as
+given if they start with `~/`. It is plain JSON:
 
 ```json
 [{ "name": "my-repo", "path": "~/code/my-repo" }]
 ```
 
+## Keyboard
+
+`/` search, `1` `2` `3` switch views, arrow keys move between quests, Enter
+opens one, Esc closes it, `R` reloads.
+
 ## How it reads a tree
 
 Quest Board parses `quest/**/*.md` itself for titles, sizes (`# [M] Title`),
 goals, plans, `Required` and `Related` links, `Waiting` items, and
-`Scheduled` dates. Readiness and the "unblocks" count come from
+`Scheduled` dates. Readiness and the "unlocks" count come from
 `quest unblocked --json`, so they match the CLI exactly. A ready quest is
 **Needs you** when a `Waiting` item names the `Maintainer`, and **Waiting**
 when it waits only on outside parties. An epic or milestone README counts as
@@ -84,9 +86,6 @@ or without its own header, and serves a strict Content-Security-Policy
 only on a document that exists in a configured tree. Claim and release change
 GitHub, so the UI asks before running them. Do not expose the server on a
 network you do not trust.
-
-The theme loads two fonts from Google Fonts and falls back to your system's
-monospace font when offline.
 
 ## Develop
 

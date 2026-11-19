@@ -13,14 +13,13 @@
   <h1><span class="gem"></span>QUEST BOARD</h1>
   <div class="chips" id="viewChips" role="group" aria-label="View"></div>
   <select id="project" aria-label="Project"></select>
-  <input id="q" type="search" placeholder="Search… ( / )" size="18" aria-label="Search quests">
+  <input id="q" type="search" placeholder="Search" title="Press / to search" size="16" aria-label="Search quests">
   <div class="chips" id="statusChips" role="group" aria-label="Status filter"></div>
   <span class="spacer"></span>
-  <button id="projects" title="Manage projects">Projects</button>
-  <button id="theme" title="Switch day/night palette">☼</button>
-  <button id="refresh" title="Reload every tree">Refresh</button>
+  <button id="projects">Projects</button>
+  <button id="theme"></button>
+  <button id="refresh" title="Reload every tree (R)">Refresh</button>
 </header>
-<div class="hud" id="stats" aria-live="polite"></div>
 <div id="banners"></div>
 <main id="board"></main>
 <aside id="panel" aria-label="Quest details" inert></aside>

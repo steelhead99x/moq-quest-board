@@ -30,15 +30,15 @@ function parseArgs(argv) {
   return opts;
 }
 
-const HELP = `Usage: quest-board [--port <n>] [repo ...]
+const HELP = `Usage: quest-board [-p|--port <n>] [repo ...]
 
-Serve a board of the Quest trees in the listed repositories, and in every
-repository already in the project list. Each repo given is added to the list.
+Serve a board of the Quest trees in the given repositories and any already in
+the project list. Repositories given are added to the list.
 
 Environment:
   PORT                 port to listen on (default 4577)
   HOST                 address to bind (default 127.0.0.1)
-  QUEST_BOARD_CONFIG   project list file (default: ${configPath()})
+  QUEST_BOARD_CONFIG   project list file (default: ${configPath({ ...process.env, QUEST_BOARD_CONFIG: '' })})
   QUEST_BIN, GH_BIN    paths to the quest and gh commands
 `;
 
@@ -134,7 +134,7 @@ const STATIC = {
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
 };
-const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+const CSP = "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
 const bracket = (h) => (h.includes(':') && !h.startsWith('[') ? `[${h}]` : h);
 
