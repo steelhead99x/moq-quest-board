@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { configPath, loadProjects, saveProjects, addProject } from '../lib/config.mjs';
+import { configPath, loadProjects, saveProjects, addProject, expand } from '../lib/config.mjs';
 
 const FIXTURE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'basic');
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'quest-board-'));
@@ -40,4 +40,26 @@ test('addProject names by folder, dedupes by path, and checks for quest/', () =>
 test('addProject keeps names unique', () => {
   const list = addProject([{ name: 'basic', path: '/elsewhere' }], FIXTURE);
   assert.deepEqual(list.map((p) => p.name), ['basic', 'basic-2']);
+});
+
+test('addProject stores an absolute path and keeps `~` paths as given', () => {
+  const rel = path.relative(process.cwd(), FIXTURE);
+  assert.deepEqual(addProject([], rel), [{ name: 'basic', path: FIXTURE }]);
+  const home = tmp();
+  fs.mkdirSync(path.join(home, 'quest'));
+  const list = addProject([], path.join(home, 'quest', '..'));
+  assert.equal(list[0].path, path.resolve(home));
+});
+
+test('re-adding a listed path keeps its custom name', () => {
+  const list = addProject([{ name: 'custom', path: FIXTURE }], FIXTURE);
+  assert.deepEqual(list, [{ name: 'custom', path: FIXTURE }]);
+});
+
+test('expand accepts either separator after ~', () => {
+  const home = os.homedir();
+  assert.equal(expand('~'), home);
+  assert.equal(expand('~/a/b'), path.join(home, 'a/b'));
+  assert.equal(expand('~\\a'), path.join(home, 'a'));
+  assert.equal(expand('/x/~/y'), '/x/~/y');
 });
