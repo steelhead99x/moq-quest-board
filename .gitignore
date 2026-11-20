@@ -3,3 +3,10 @@ node_modules/
 *.tmp
 .DS_Store
 projects.json
+.env
+.env.*
+dist/
+build/
+coverage/
+.idea/
+.vscode/

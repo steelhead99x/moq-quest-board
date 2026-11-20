@@ -1,16 +1,16 @@
 {
-  "name": "quest-board",
+  "name": "moq-quest-board",
   "version": "0.1.0",
   "description": "An 8-bit board, dependency map, and inbox for Quest trees (moq-dev/quest) across your repositories",
   "type": "module",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/steelhead99x/quest-board.git"
+    "url": "git+https://github.com/steelhead99x/moq-quest-board.git"
   },
-  "homepage": "https://github.com/steelhead99x/quest-board#readme",
+  "homepage": "https://github.com/steelhead99x/moq-quest-board#readme",
   "bugs": {
-    "url": "https://github.com/steelhead99x/quest-board/issues"
+    "url": "https://github.com/steelhead99x/moq-quest-board/issues"
   },
   "bin": {
     "quest-board": "server.mjs"
@@ -32,6 +32,7 @@
     "node": ">=20"
   },
   "keywords": [
+    "moq",
     "quest",
     "kanban",
     "roadmap",

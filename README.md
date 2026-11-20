@@ -1,6 +1,6 @@
-# Quest Board
+# moq-quest-board
 
-An 8-bit quest log for your repositories. Quest Board is a local web UI over
+An 8-bit quest log for your repositories. moq-quest-board is a local web UI over
 [Quest](https://github.com/moq-dev/quest) trees: the `quest/` directories of
 Markdown plans that you and your agents claim and finish. Point it at one
 repository or several.
@@ -28,8 +28,8 @@ system monospace font offline.
 ## Run it
 
 ```sh
-git clone https://github.com/steelhead99x/quest-board.git
-cd quest-board
+git clone https://github.com/steelhead99x/moq-quest-board.git
+cd moq-quest-board
 node server.mjs ~/code/my-repo ~/code/other-repo
 ```
 
@@ -37,7 +37,7 @@ Then open <http://127.0.0.1:4577>. Each repository you name is added to your
 project list, so next time `node server.mjs` alone is enough. You can also add
 and remove projects from the **Projects** button.
 
-`npm link` installs a `quest-board` command.
+`npm link` installs a `quest-board` command (the command and config folder keep the short name).
 
 | Option / variable    | Meaning                                                                 |
 | -------------------- | ----------------------------------------------------------------------- |
@@ -61,7 +61,7 @@ opens one, Esc closes it, `R` reloads.
 
 ## How it reads a tree
 
-Quest Board parses `quest/**/*.md` itself for titles, sizes (`# [M] Title`),
+moq-quest-board parses `quest/**/*.md` itself for titles, sizes (`# [M] Title`),
 goals, plans, `Required` and `Related` links, `Waiting` items, and
 `Scheduled` dates. Readiness and the "unlocks" count come from
 `quest unblocked --json`, so they match the CLI exactly. A ready quest is
@@ -94,5 +94,5 @@ npm test        # node --test
 npm run check   # syntax check
 ```
 
-Quest Board is not affiliated with the Quest project. Licensed under either of
+moq-quest-board is not affiliated with the Quest project. Licensed under either of
 [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option.
